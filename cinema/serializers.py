@@ -1,4 +1,6 @@
+from django.db import transaction
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 
 from cinema.models import Genre, Actor, CinemaHall, Movie, MovieSession, Order, Ticket
 
@@ -81,19 +83,69 @@ class MovieSessionDetailSerializer(MovieSessionSerializer):
 
 
 class TicketSerializer(serializers.ModelSerializer):
-    movie_session = MovieSessionListSerializer(many=False, read_only=True)
     class Meta:
         model = Ticket
         fields = (
-            'id',
-            'row',
-            'seat',
-            'movie_session',
+            "id",
+            "row",
+            "seat",
+            "movie_session",
+        )
+
+
+class TicketMovieListSerializer(TicketSerializer):
+    movie_session = MovieSessionListSerializer(read_only=True)
+    class Meta:
+        model = Ticket
+        fields = (
+            "id",
+            "row",
+            "seat",
+            "movie_session",
         )
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    tickets = TicketSerializer(many=True, read_only=False)
+    class Meta:
+        model = Order
+        fields = (
+            'id',
+            'tickets',
+            'created_at',
+        )
+
+    def create(self, validated_data):
+        tickets_data = validated_data.pop("tickets")
+        user = self.context["request"].user
+
+        with transaction.atomic():
+            # Create the order
+            order = Order.objects.create(user=user)
+
+            for ticket_data in tickets_data:
+                # Get the movie_session ID from the ticket data
+                movie_session_id = ticket_data.pop("movie_session")
+
+                # Retrieve the MovieSession instance
+                try:
+                    movie_session = MovieSession.objects.get(id=movie_session_id)
+                except MovieSession.DoesNotExist:
+                    raise serializers.ValidationError(
+                        {"movie_session": f"MovieSession with ID {movie_session_id} does not exist."}
+                    )
+
+                # Create the ticket using the primary key for movie_session
+                Ticket.objects.create(
+                    order=order,
+                    movie_session=movie_session,
+                    **ticket_data
+                )
+
+            return order
+
+
+class OrderListSerializer(serializers.ModelSerializer):
+    tickets = TicketMovieListSerializer(many=True, read_only=False, allow_empty=False)
 
     class Meta:
         model = Order
