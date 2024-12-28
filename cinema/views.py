@@ -11,27 +11,33 @@ from cinema.serializers import (
     MovieSessionListSerializer,
     MovieDetailSerializer,
     MovieSessionDetailSerializer,
-    MovieListSerializer, OrderSerializer, OrderListSerializer,
+    MovieListSerializer,
+    OrderSerializer,
+    OrderListSerializer,
 )
 
 
 class GenreViewSet(viewsets.ModelViewSet):
     queryset = Genre.objects.all()
     serializer_class = GenreSerializer
+    pagination_class = None
 
 
 class ActorViewSet(viewsets.ModelViewSet):
     queryset = Actor.objects.all()
     serializer_class = ActorSerializer
+    pagination_class = None
 
 
 class CinemaHallViewSet(viewsets.ModelViewSet):
     queryset = CinemaHall.objects.all()
     serializer_class = CinemaHallSerializer
+    pagination_class = None
 
 
 class MovieViewSet(viewsets.ModelViewSet):
     queryset = Movie.objects.all()
+    pagination_class = None
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -68,9 +74,11 @@ class MovieViewSet(viewsets.ModelViewSet):
         # Remove duplicates caused by many-to-many relationships
         return queryset.distinct()
 
+
 class MovieSessionViewSet(viewsets.ModelViewSet):
     queryset = MovieSession.objects.all()
     serializer_class = MovieSessionSerializer
+    pagination_class = None
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -81,20 +89,21 @@ class MovieSessionViewSet(viewsets.ModelViewSet):
 
         return MovieSessionSerializer
 
-
     def filter_queryset(self, queryset):
-        """
-        Filter movie sessions by date and movie.
-        """
-        date = self.request.query_params.get("date", None)
-        movie_id = self.request.query_params.get("movie", None)
+        date = self.request.query_params.get("date")
+        movie_id = self.request.query_params.get("movie")
+
         if date:
-            queryset = queryset.filter(show_time__date=date)
+            try:
+                # Match only the date portion of show_time
+                queryset = queryset.filter(show_time__date=date)
+            except ValueError:
+                queryset = queryset.none()
 
         if movie_id:
-            queryset = queryset.filter(movie__id=movie_id)
+            queryset = queryset.filter(movie_id=movie_id)
 
-        return queryset
+        return queryset.distinct()
 
 
 class OrdersViewSet(viewsets.ModelViewSet):
