@@ -61,6 +61,7 @@ class MovieSessionListSerializer(MovieSessionSerializer):
     cinema_hall_capacity = serializers.IntegerField(
         source="cinema_hall.capacity", read_only=True
     )
+    tickets_available = serializers.SerializerMethodField()
 
     class Meta:
         model = MovieSession
@@ -70,7 +71,16 @@ class MovieSessionListSerializer(MovieSessionSerializer):
             "movie_title",
             "cinema_hall_name",
             "cinema_hall_capacity",
+            "tickets_available"
         )
+
+    def get_tickets_available(self, obj):
+        """
+        Calculate the number of tickets available for the movie session.
+        """
+        total_capacity = obj.cinema_hall.capacity
+        tickets_taken = Ticket.objects.filter(movie_session=obj).count()
+        return total_capacity - tickets_taken
 
 
 class MovieSessionDetailSerializer(MovieSessionSerializer):
@@ -87,7 +97,7 @@ class MovieSessionDetailSerializer(MovieSessionSerializer):
         Retrieve all taken places (row and seat) for the movie session.
         """
         tickets = Ticket.objects.filter(movie_session=obj)
-        return [{"row": ticket.row, "seat": ticket.seat } for ticket in tickets]
+        return [{"row": ticket.row, "seat": ticket.seat} for ticket in tickets]
 
 
 class TicketSerializer(serializers.ModelSerializer):
