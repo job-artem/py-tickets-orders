@@ -83,6 +83,8 @@ class MovieSessionDetailSerializer(MovieSessionSerializer):
 
 
 class TicketSerializer(serializers.ModelSerializer):
+    movie_session = serializers.PrimaryKeyRelatedField(queryset=MovieSession.objects.all())
+
     class Meta:
         model = Ticket
         fields = (
@@ -95,6 +97,7 @@ class TicketSerializer(serializers.ModelSerializer):
 
 class TicketMovieListSerializer(TicketSerializer):
     movie_session = MovieSessionListSerializer(read_only=True)
+
     class Meta:
         model = Ticket
         fields = (
@@ -106,6 +109,8 @@ class TicketMovieListSerializer(TicketSerializer):
 
 
 class OrderSerializer(serializers.ModelSerializer):
+    tickets = TicketSerializer(many=True, allow_empty=False)
+
     class Meta:
         model = Order
         fields = (
@@ -123,23 +128,8 @@ class OrderSerializer(serializers.ModelSerializer):
             order = Order.objects.create(user=user)
 
             for ticket_data in tickets_data:
-                # Get the movie_session ID from the ticket data
-                movie_session_id = ticket_data.pop("movie_session")
-
-                # Retrieve the MovieSession instance
-                try:
-                    movie_session = MovieSession.objects.get(id=movie_session_id)
-                except MovieSession.DoesNotExist:
-                    raise serializers.ValidationError(
-                        {"movie_session": f"MovieSession with ID {movie_session_id} does not exist."}
-                    )
-
-                # Create the ticket using the primary key for movie_session
-                Ticket.objects.create(
-                    order=order,
-                    movie_session=movie_session,
-                    **ticket_data
-                )
+                # No need to fetch `movie_session` as it is already validated
+                Ticket.objects.create(order=order, **ticket_data)
 
             return order
 
